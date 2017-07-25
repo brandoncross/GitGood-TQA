@@ -6,7 +6,7 @@ import {DateService } from '../../../services/date.service';
 import {Subscription} from "rxjs/Subscription";
 import { CompleterService, CompleterData } from 'ng2-completer';
 import {NgbDateStruct} from '@ng-bootstrap/ng-bootstrap';
-import {GitEvent} from "../../../GitEvent";
+import {GitEvent} from "../../../models/GitEvent";
 
 @Component({
   selector: 'app-edit',
@@ -27,6 +27,8 @@ export class EditComponent implements OnInit, OnDestroy {
   constructor(private route: ActivatedRoute, private dateService: DateService, public authService: AuthService, private completerService: CompleterService) {
 
   }
+
+  rooms = [{number:1,name:"Room 1"}, {number:2,name:"Room 2"},{number:3,name:"Room 3"},];
 
 
   handleAddMember(obj: any) {
@@ -70,6 +72,8 @@ export class EditComponent implements OnInit, OnDestroy {
     return this.dateService.isDateDisabled(new Date(date.year, date.month - 1, date.day, 0, 0, 0));
 
   };
+
+
 
 
 

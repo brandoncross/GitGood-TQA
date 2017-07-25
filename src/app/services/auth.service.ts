@@ -6,7 +6,9 @@ import * as firebase from 'firebase/app';
 import {AngularFireDatabase, FirebaseListObservable, FirebaseObjectObservable} from 'angularfire2/database';
 import 'rxjs/add/operator/map';
 import 'rxjs/add/operator/mergeMap';
-import {GitEvent} from "../GitEvent";
+import {GitEvent} from "../models/GitEvent";
+import {EmailService} from "./email.service";
+import {Observable} from "rxjs/Observable";
 @Injectable()
 export class AuthService {
 
@@ -41,15 +43,17 @@ export class AuthService {
   });
 }
 
+
   public getEventsByYearAllRooms(_date: Date):Promise<Array<any>> {
 
     return new Promise( resolve => {
       this.db.list('/events').subscribe(roomList =>{
         let eventsList =[];
-        roomList.forEach(room=>{
+        roomList.forEach((room, index)=>{
+          console.log("room",room);
           for(let event in room){
             if(room[event].meetingDate.year === _date.getFullYear()){
-              eventsList.push(room[event]);
+              eventsList.push({...room[event]});
             }
           }
         });
@@ -150,9 +154,13 @@ export class AuthService {
 
 
 
-  public getEventByID(id:string): FirebaseObjectObservable<any>{
+  public getEventByID(id:string): Promise<any>{
 
-    return this.db.object('/events/'+id);
+    return new Promise(resolve => {
+      this.db.object('/events/1/'+id).subscribe(event => {
+        resolve(event);
+      })
+    });
   }
 
   public getEmployees(): FirebaseListObservable<any>{
@@ -344,18 +352,24 @@ export class AuthService {
 
   public createEvent(room: number,reservation: GitEvent) {
 
+    let route = this.router;
     this.checkStartAndEndTime(reservation,room).then(dateAvailable => {
 
       if(dateAvailable){
         this.db.list('/events/'+room).push(reservation)
           .then(resolve => {
+            let email = new EmailService;
+            email.sendInvitationToMultipleEmails(reservation.getMembers());
             console.log("Event created in the database successfully" + resolve)
+            route.navigate(['/a']);
           })
           .catch(error => {
             console.log("Error occurred\n" + error.message);
           })
       }
     });
+
+
 
   }
 

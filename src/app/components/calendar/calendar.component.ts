@@ -18,10 +18,18 @@ import {
 import {
   CalendarEvent,
   CalendarEventAction,
+  CalendarMonthViewDay,
   CalendarEventTimesChangedEvent
 } from 'angular-calendar';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {FirebaseListObservable} from "angularfire2/database";
+import {EmailService} from "../../services/email.service";
+import {HttpClient} from "selenium-webdriver/http";
+import {Http, HttpModule} from "@angular/http";
+import {GitEvent} from "../../models/GitEvent";
+import { Router, ActivatedRoute } from '@angular/router';
+
+
 
 
 
@@ -47,7 +55,8 @@ const colors: any = {
   selector: 'app-calendar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './calendar.component.html',
-  styleUrls: ['./calendar.component.css']
+  styleUrls: ['./calendar.component.css'],
+  providers:[HttpModule]
 })
 export class CalendarComponent implements OnInit, OnDestroy {
 
@@ -58,7 +67,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
   viewDate: Date = new Date();
   @ViewChild('modalContent') modalContent: TemplateRef<any>;
 
-  constructor(public afAuth: AngularFireAuth, public authService: AuthService, private modal: NgbModal) {
+  constructor(public afAuth: AngularFireAuth, public authService: AuthService, private modal: NgbModal,private http:Http, private r:ActivatedRoute, private router: Router) {
     this._user = afAuth.authState;
 
     this._root = authService.getEventsByYear(this.viewDate,1);
@@ -96,35 +105,42 @@ export class CalendarComponent implements OnInit, OnDestroy {
   }
 
 
-
-  events: CalendarEvent[] = [{
-    start: subDays(startOfDay(new Date()), 1),
-    end: addDays(new Date(), 1),
-    title: 'A 3 day event',
-    color: colors.red,
-    actions: this.actions
-  }, {
-    start: startOfDay(new Date()),
-    title: 'An event with no end date',
-    color: colors.yellow,
-    actions: this.actions
-  }, {
-    start: subDays(endOfMonth(new Date()), 3),
-    end: addDays(endOfMonth(new Date()), 3),
-    title: 'A long event that spans 2 months',
-    color: colors.blue
-  }, {
-    start: addHours(startOfDay(new Date()), 2),
-    end: new Date(),
-    title: 'A draggable and resizable event',
-    color: colors.yellow,
-    actions: this.actions,
-    resizable: {
-      beforeStart: true,
-      afterEnd: true
-    },
-    draggable: true
-  }];
+    events: CalendarEvent[] = [];
+  // events: Array<CalendarEvent<{gitEvent: GitEvent}>> = new Array<CalendarEvent<{gitEvent: GitEvent}>>({
+  //   start: subDays(startOfDay(new Date()), 1),
+  //   end: addDays(new Date(), 1),
+  //   title: 'A 3 day event',
+  //   color: colors.red,
+  //   actions: this.actions
+  // });
+  //  = [{
+  //   start: subDays(startOfDay(new Date()), 1),
+  //   end: addDays(new Date(), 1),
+  //   title: 'A 3 day event',
+  //   color: colors.red,
+  //   actions: this.actions
+  // }, {
+  //   start: startOfDay(new Date()),
+  //   title: 'An event with no end date',
+  //   color: colors.yellow,
+  //   actions: this.actions
+  // }, {
+  //   start: subDays(endOfMonth(new Date()), 3),
+  //   end: addDays(endOfMonth(new Date()), 3),
+  //   title: 'A long event that spans 2 months',
+  //   color: colors.blue
+  // }, {
+  //   start: addHours(startOfDay(new Date()), 2),
+  //   end: new Date(),
+  //   title: 'A draggable and resizable event',
+  //   color: colors.yellow,
+  //   actions: this.actions,
+  //   resizable: {
+  //     beforeStart: true,
+  //     afterEnd: true
+  //   },
+  //   draggable: true
+  // }];
 
  activeDayIsOpen: boolean = true;
 
@@ -151,8 +167,11 @@ export class CalendarComponent implements OnInit, OnDestroy {
   }
 
   handleEvent(action: string, event: CalendarEvent): void {
-    this.modalData = {event, action};
-    this.modal.open(this.modalContent, {size: 'lg'});
+    // this.router.navigate(['404'], {queryParams: {'message': `Meeting by ID ${this.id} not found`}});
+
+    this.router.navigate(['../meetings', event.meta.gitEvent.$key], { relativeTo: this.r })
+    // this.modalData = {event, action};
+    // this.modal.open(this.modalContent, {size: 'lg'});
   }
 
    modalData: {
@@ -177,30 +196,51 @@ export class CalendarComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-
-
     // Grabs events from the database and formats it for the calendar
     this._root.take(1).subscribe(x => {
+      console.log("XX",x);
       x.forEach(entry => {
 
         console.log(entry.meetingDate);
-
-        this.events.push({
-          title: entry.title,
-          start:startOfDay( new Date(entry.meetingDate.year, entry.meetingDate.month-1, entry.meetingDate.day, entry.meetingDate.startingHour/100,0,0)),
-          end: endOfDay(new Date(entry.meetingDate.year, entry.meetingDate.month-1, entry.meetingDate.day, entry.meetingDate.endingHour/100,0,0)),
-          color: colors.red,
-          draggable: true,
-          resizable: {
-            beforeStart: true,
-            afterEnd: true
-          }
-        })
+        let event = GitEvent.fromData(entry);
+         this.events.push(
+         {
+           title: event.title,
+           start: event.getStartingDate(),
+           end: event.getEndingDate(),
+           color: colors.blue,
+           meta:{
+             gitEvent: event
+           }
+           
+         });
+         this.refresh.next();
+        // this.events.push({
+        //   title: entry.title,
+        //   start:startOfDay( new Date(entry.meetingDate.year, entry.meetingDate.month-1, entry.meetingDate.day, entry.meetingDate.startingHour/100,0,0)),
+        //   end: endOfDay(new Date(entry.meetingDate.year, entry.meetingDate.month-1, entry.meetingDate.day, entry.meetingDate.endingHour/100,0,0)),
+        //   color: colors.red,
+        //   draggable: true,
+        //   resizable: {
+        //     beforeStart: true,
+        //     afterEnd: true
+        //   }
+        // })
       })
+
+
     });
 
 
 
+  }
+
+  beforeMonthViewRender({ body }: { body: CalendarMonthViewDay[] }): void {
+    // body.forEach(day => {
+    //   day.badgeTotal = day.events.filter(
+    //     event => event.meta.incrementsBadgeTotal
+    //   ).length;
+    // });
   }
 
 
